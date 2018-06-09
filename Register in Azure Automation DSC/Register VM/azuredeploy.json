@@ -10,14 +10,14 @@
         },
         "modulesUrl": {
             "type": "string",
-            "defaultValue": "https://github.com/pthoor/TestAzure/blob/master/Register%20in%20Azure%20Automation%20DSC/UpdateLCMforAAPull.zip?raw=true",
+            "defaultValue": "https://github.com/pthoor/TestAzure/blob/master/Register%20in%20Azure%20Automation%20DSC/ADDSExistingDomain.zip?raw=true",
             "metadata": {
                 "description": "URL for the DSC configuration package. NOTE: Can be a Github url(raw) to the zip file (this is the default value)"
             }
         },
         "configurationFunction": {
             "type": "string",
-            "defaultValue": "UpdateLCMforAAPull.ps1\\ConfigureLCMforAAPull",
+            "defaultValue": "ADDSExistingDomain.ps1\\ADDSExistingDomain",
             "metadata": {
                 "description": "DSC configuration function to call. Should contain filename and function in format fileName.ps1\\configurationfunction"
             }
@@ -36,6 +36,7 @@
         },
         "nodeConfigurationName": {
             "type": "string",
+            "defaultValue": "ADDSExistingDomain",
             "metadata": {
                 "description": "The name of the node configuration, on the Azure Automation DSC pull server, that this node will be configured as"
             }
