@@ -2,182 +2,236 @@
     "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "vmName": {
-            "type": "string",
-            "metadata": {
-                "description": "Name of the existing VM to apply the DSC configuration to"
-            }
-        },
-        "modulesUrl": {
-            "type": "string",
-            "defaultValue": "https://github.com/kvaes/TasmanianTraders-IaC-AzureAutomationDSC/raw/master/RegisterVirtualMachine/UpdateLCMforAAPull.zip",
-            "metadata": {
-                "description": "URL for the DSC configuration package. NOTE: Can be a Github url(raw) to the zip file (this is the default value)"
-            }
-        },
-        "configurationFunction": {
-            "type": "string",
-            "defaultValue": "UpdateLCMforAAPull.ps1\\ConfigureLCMforAAPull",
-            "metadata": {
-                "description": "DSC configuration function to call. Should contain filename and function in format fileName.ps1\\configurationfunction"
-            }
-        },
-        "registrationKey": {
-            "type": "securestring",
-            "metadata": {
-                "description": "Registration key to use to onboard to the Azure Automation DSC pull/reporting server"
-            }
-        },
-        "registrationUrl": {
-            "type": "string",
-            "metadata": {
-                "description": "Registration url of the Azure Automation DSC pull/reporting server"
-            }
-        },
-        "nodeConfigurationName": {
-            "type": "string",
-            "metadata": {
-                "description": "The name of the node configuration, on the Azure Automation DSC pull server, that this node will be configured as"
-            }
-        },
-        "configurationMode": {
-            "type": "string",
-            "defaultValue": "ApplyAndMonitor",
-            "allowedValues": [
-                "ApplyOnly",
-                "ApplyAndMonitor",
-                "ApplyAndAutoCorrect"
-            ],
-            "metadata": {
-                "description": "DSC agent (LCM) configuration mode setting. ApplyOnly, ApplyAndMonitor, or ApplyAndAutoCorrect"
-            }
-        },
-        "configurationModeFrequencyMins": {
-            "type": "int",
-            "defaultValue": 15,
-            "metadata": {
-                "description": "DSC agent (LCM) configuration mode frequency setting, in minutes"
-            }
-        },
-        "refreshFrequencyMins": {
-            "type": "int",
-            "defaultValue": 30,
-            "metadata": {
-                "description": "DSC agent (LCM) refresh frequency setting, in minutes"
-            }
-        },
-        "rebootNodeIfNeeded": {
-            "type": "bool",
-            "defaultValue": true,
-            "metadata": {
-                "description": "DSC agent (LCM) rebootNodeIfNeeded setting"
-            }
-        },
-        "actionAfterReboot": {
-            "type": "string",
-            "defaultValue": "ContinueConfiguration",
-            "allowedValues": [
-                "ContinueConfiguration",
-                "StopConfiguration"
-            ],
-            "metadata": {
-                "description": "DSC agent (LCM) actionAfterReboot setting. ContinueConfiguration or StopConfiguration"
-            }
-        },
-        "allowModuleOverwrite": {
-            "type": "bool",
-            "defaultValue": false,
-            "metadata": {
-                "description": "DSC agent (LCM) allowModuleOverwrite setting"
-            }
-        },
-        "timestamp": {
-            "type": "string",
-            "defaultValue": "MM/dd/yyyy H:mm:ss tt",
-            "metadata": {
-                "description": "The current datetime, as a string, to force the request to go through ARM even if all fields are the same as last ARM deployment of this template; example in parameters file is in MM/dd/yyyy H:mm:ss tt format"
-            }
+      "dcType": {
+        "type": "string",
+        "allowedValues": [
+          "FirstDC",
+          "AdditionalDC"
+        ],
+        "defaultValue": "AdditionalDC",
+        "metadata": {
+          "description": "Is it the first domain controller (new domain/forest) or will you be adding one?"
         }
+      },
+      "adminUsername": {
+        "type": "string",
+        "metadata": {
+          "description": "User name for the Virtual Machine."
+        }
+      },
+      "adminPassword": {
+        "type": "securestring",
+        "metadata": {
+          "description": "Password for the Virtual Machine."
+        }
+      },
+      "vmPrefix": {
+        "type": "string",
+        "metadata": {
+          "description": "The prefix that will be used for the vm name"
+        }
+      },
+      "vmSuffix": {
+        "type": "string",
+        "metadata": {
+          "description": "The suffix that will be used for the vm name"
+        }
+      },
+      "existingVirtualNetworkName": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the existing VNET"
+        }
+      },
+      "existingVirtualNetworkResourceGroup": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the existing VNET resource group"
+        }
+      },
+      "subnetName": {
+        "type": "string",
+        "metadata": {
+          "description": "Name of the subnet in the virtual network you want to use"
+        }
+      },
+      "dscRegistrationKey": {
+        "type": "string",
+        "metadata": {
+          "description": "Registration key to use to onboard to the Azure Automation DSC pull/reporting server"
+        }
+      },
+      "dscRegistrationUrl": {
+        "type": "string",
+        "metadata": {
+          "description": "Registration url of the Azure Automation DSC pull/reporting server"
+        }
+      }
     },
     "variables": {
-
+      "vmName": "addc",
+      "vmFullName": "[concat(parameters('vmPrefix'),variables('vmName'),parameters('vmSuffix'))]",
+      "vmSize": "Standard_B2s",
+      "imagePublisher": "MicrosoftWindowsServer",
+      "imageOffer": "WindowsServer",
+      "windowsOSVersion": "2016-Datacenter",
+      "OSDiskName": "[concat('disk-',variables('vmFullName'),'-os')]",
+      "dataDisk1VhdName": "[concat('disk-',variables('vmFullName'),'-data01')]",
+      "storageAccountType": "Standard_LRS",
+      "nicName": "[concat('nic-',variables('vmFullName'))]",
+      "vnetName": "[parameters('existingVirtualNetworkName')]",
+      "vnetRG": "[parameters('existingVirtualNetworkResourceGroup')]",
+      "vnetSubnet": "[parameters('subnetName')]",
+      "vnetID": "[resourceId(variables('vnetRG'), 'Microsoft.Network/virtualNetworks', variables('vnetName'))]",
+      "subnetRef": "[concat(variables('vnetID'),'/subnets/', variables('vnetSubnet'))]",
+      "apiVersion": "2015-06-15",
+      "apiVersionManagedDisks": "2016-04-30-preview",
+      "dscLinkedTemplateUri":  "https://raw.githubusercontent.com/pthoor/TestAzure/master/Register%20in%20Azure%20Automation%20DSC/azuredeploy.json",
+      "dscRegistrationKey": "[parameters('dscRegistrationKey')]",
+      "dscRegistrationUrl": "[parameters('dscRegistrationUrl')]",
+      "dscNodeConfigurationName": "[concat('DscConfDomainController.',parameters('dcType'))]",
+      "updateip_templateUri": "https://raw.githubusercontent.com/kvaes/TasmanianTraders-IaC-ActiveDirectory/master/update-nic.json"
     },
     "resources": [
-    {
-        "type": "Microsoft.Compute/virtualMachines/extensions",
-        "name": "[concat(parameters('vmName'),'/Microsoft.Powershell.DSC')]",
-        "apiVersion": "2015-06-15",
+      {
+        "type": "Microsoft.Compute/disks",
+        "name": "[variables('dataDisk1VhdName')]",
+        "apiVersion": "[variables('apiVersionManagedDisks')]",
+        "location": "[resourceGroup().location]",
+        "properties":
+        {
+          "creationData":
+          {
+            "createOption" : "Empty"
+          }
+        ,
+          "accountType" : "[variables('storageAccountType')]",
+          "diskSizeGB": "32"
+        }
+      },
+      {
+        "apiVersion": "[variables('apiVersion')]",
+        "type": "Microsoft.Network/networkInterfaces",
+        "name": "[variables('nicName')]",
         "location": "[resourceGroup().location]",
         "properties": {
-            "publisher": "Microsoft.Powershell",
-            "type": "DSC",
-            "typeHandlerVersion": "2.19",
-            "autoUpgradeMinorVersion": true,
-            "protectedSettings": {
-                "Items": {
-                    "registrationKeyPrivate": "[parameters('registrationKey')]"
+          "ipConfigurations": [
+            {
+              "name": "ipconfig1",
+              "properties": {
+                "privateIPAllocationMethod": "Dynamic",
+                "subnet": {
+                  "id": "[variables('subnetRef')]"
                 }
-            },
-            "settings": {
-                "ModulesUrl": "[parameters('modulesUrl')]",
-                "SasToken": "",
-                "ConfigurationFunction": "[parameters('configurationFunction')]",
-                "Properties": [
-                    {
-                        "Name": "RegistrationKey",
-                        "Value": {
-                            "UserName": "PLACEHOLDER_DONOTUSE",
-                            "Password": "PrivateSettingsRef:registrationKeyPrivate"
-                        },
-                        "TypeName": "System.Management.Automation.PSCredential"
-                    },
-                    {
-                        "Name": "RegistrationUrl",
-                        "Value": "[parameters('registrationUrl')]",
-                        "TypeName": "System.String"
-                    },
-                    {
-                        "Name": "NodeConfigurationName",
-                        "Value": "[parameters('nodeConfigurationName')]",
-                        "TypeName": "System.String"
-                    },
-                    {
-                        "Name": "ConfigurationMode",
-                        "Value": "[parameters('configurationMode')]",
-                        "TypeName": "System.String"
-                    },
-                    {
-                        "Name": "ConfigurationModeFrequencyMins",
-                        "Value": "[parameters('configurationModeFrequencyMins')]",
-                        "TypeName": "System.Int32"
-                    },
-                    {
-                        "Name": "RefreshFrequencyMins",
-                        "Value": "[parameters('refreshFrequencyMins')]",
-                        "TypeName": "System.Int32"
-                    },
-                    {
-                        "Name": "RebootNodeIfNeeded",
-                        "Value": "[parameters('rebootNodeIfNeeded')]",
-                        "TypeName": "System.Boolean"
-                    },
-                    {
-                        "Name": "ActionAfterReboot",
-                        "Value": "[parameters('actionAfterReboot')]",
-                        "TypeName": "System.String"
-                    },
-                    {
-                        "Name": "AllowModuleOverwrite",
-                        "Value": "[parameters('allowModuleOverwrite')]",
-                        "TypeName": "System.Boolean"
-                    },
-                    {
-                        "Name": "Timestamp",
-                        "Value": "[parameters('timestamp')]",
-                        "TypeName": "System.String"
-                    }
-                ]
+              }
             }
+          ]
         }
-    }]
-}
+      },
+      {
+        "apiVersion": "[variables('apiVersionManagedDisks')]",
+        "type": "Microsoft.Compute/virtualMachines",
+        "name": "[variables('vmFullName')]",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+          "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]",
+          "[concat('Microsoft.Compute/disks/', variables('dataDisk1VhdName'))]"
+        ],
+        "properties": {
+          "hardwareProfile": {
+            "vmSize": "[variables('vmSize')]"
+          },
+          "osProfile": {
+            "computerName": "[variables('vmFullName')]",
+            "adminUsername": "[parameters('adminUsername')]",
+            "adminPassword": "[parameters('adminPassword')]"
+          },
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "[variables('imagePublisher')]",
+              "offer": "[variables('imageOffer')]",
+              "sku": "[variables('windowsOSVersion')]",
+              "version": "latest"
+            },
+            "osDisk": {
+              "name": "[variables('OSDiskName')]",
+              "createOption": "FromImage"
+            },
+            "dataDisks": [
+              {
+                "lun": 2,
+                "name": "[variables('dataDisk1VhdName')]",
+                "createOption": "attach",
+                "managedDisk":
+                {
+                  "id": "[resourceId('Microsoft.Compute/disks', variables('dataDisk1VhdName'))]"
+                }
+              }
+            ]
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "id": "[resourceId('Microsoft.Network/networkInterfaces',variables('nicName'))]"
+              }
+            ]
+          }
+        }
+      },
+      { 
+        "apiVersion": "2015-01-01", 
+        "name": "linkedTemplateDscPullServer", 
+        "type": "Microsoft.Resources/deployments", 
+        "dependsOn": [
+          "[concat('Microsoft.Compute/virtualMachines/', variables('vmFullName'))]"
+        ],
+        "properties": { 
+          "mode": "incremental", 
+          "templateLink": {
+            "uri": "[variables('dscLinkedTemplateUri')]",
+            "contentVersion": "1.0.0.0"
+          }, 
+          "parameters": { 
+            "vmName":{
+              "value": "[variables('vmFullName')]"
+            },
+            "registrationKey":{
+              "value": "[variables('dscRegistrationKey')]"
+            },
+            "registrationUrl":{
+              "value": "[variables('dscRegistrationUrl')]"
+            },
+            "nodeConfigurationName":{
+              "value": "[variables('dscNodeConfigurationName')]"
+            } 
+          } 
+        } 
+      },
+      {
+        "type": "Microsoft.Resources/deployments",
+        "name": "linkedTemplateUpdateIp",
+        "apiVersion": "2015-01-01",
+        "dependsOn": [
+          "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
+        ],
+        "properties": {
+          "mode": "Incremental",
+          "templateLink": {
+            "uri": "[variables('updateip_templateUri')]",
+            "contentVersion": "1.0.0.0"
+          },
+          "parameters": {
+            "nicName": {
+              "value": "[variables('nicName')]"
+            },
+            "SubnetRef": {
+              "value": "[variables('SubnetRef')]"
+            },
+            "privateIp": {
+              "value": "[reference(concat('Microsoft.Network/networkInterfaces/', variables('nicName'))).ipConfigurations[0].properties.privateIPAddress]"
+            }
+          }
+        }
+      }
+    ]
+  }
